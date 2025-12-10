@@ -1,28 +1,29 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, Search, X, Sprout, Flower2 } from 'lucide-react';
+import { Upload, Search, X, Sprout } from 'lucide-react';
 import Image from 'next/image';
 import Navbar from './layouts/Navbar';
 import Footer from './layouts/Footer';
+import { useImagePrediction } from '@/hooks/useImagePrediction';
 
 interface CoffeeResult {
   name: string;
   score: string;
 }
 
-const DB = [{ name: 'Aceh Gayo' }, { name: 'Toraja Sapan' }, { name: 'Bali Kintamani' }, { name: 'Java Preanger' }, { name: 'Flores Bajawa' }, { name: 'Papua Wamena' }];
-
 export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [result, setResult] = useState<CoffeeResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { prediction, loading: isScanning, error, predictImage } = useImagePrediction();
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     setPreview(url);
+    setImageFile(file);
     setResult(null);
   };
 
@@ -31,15 +32,17 @@ export default function Home() {
     if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
   };
 
-  const processImage = () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      const randomData = DB[Math.floor(Math.random() * DB.length)];
-      const randomScore = (Math.random() * (99.5 - 92.0) + 92.0).toFixed(1);
-
-      setResult({ name: randomData.name, score: randomScore });
-      setIsScanning(false);
-    }, 2500);
+  const processImage = async () => {
+    if (!imageFile) return;
+    try {
+      const prediction = await predictImage(imageFile);
+      setResult({
+        name: prediction.class_name,
+        score: prediction.confidence.toFixed(1),
+      });
+    } catch (err) {
+      console.error('Prediction failed:', err);
+    }
   };
 
   const reset = (e: React.MouseEvent) => {
@@ -69,7 +72,7 @@ export default function Home() {
             <div className="bg-[#15100b] rounded-lg p-6 md:p-8 h-full">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-display text-white text-xl">Unggah Citra Biji</h3>
-                <div className="px-3 py-1 bg-kopi-800 rounded border border-kopi-600 text-[10px] text-emas-500 tracking-wider">AI MODEL V.1.0</div>
+                <div className="px-3 py-1 bg-kopi-800 rounded border border-kopi-600 text-[10px] text-emas-500 tracking-wider">AI MODEL</div>
               </div>
 
               <div
