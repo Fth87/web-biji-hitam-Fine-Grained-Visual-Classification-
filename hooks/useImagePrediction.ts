@@ -27,7 +27,7 @@ export const useImagePrediction = (): UseImagePredictionReturn => {
       // Coba dengan field name 'file' instead of 'image'
       formData.append('file', image, image instanceof File ? image.name : 'image.jpg');
 
-      const response = await fetch('http://127.0.0.1:8000/predict', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/predict`, {
         method: 'POST',
         body: formData,
       });
