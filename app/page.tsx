@@ -5,26 +5,21 @@ import { Upload, Search, X, Sprout } from 'lucide-react';
 import Image from 'next/image';
 import Navbar from './layouts/Navbar';
 import Footer from './layouts/Footer';
-import { useImagePrediction } from '@/hooks/useImagePrediction';
-
-interface CoffeeResult {
-  name: string;
-  score: string;
-}
+import { useImagePrediction, type PredictionResult } from '@/hooks/useImagePrediction';
 
 export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [result, setResult] = useState<CoffeeResult | null>(null);
+  const [predictions, setPredictions] = useState<PredictionResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { prediction, loading: isScanning, error, predictImage } = useImagePrediction();
+  const { predictions: apiPredictions, loading: isScanning, error, predictImage } = useImagePrediction();
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     setPreview(url);
     setImageFile(file);
-    setResult(null);
+    setPredictions([]);
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -35,11 +30,8 @@ export default function Home() {
   const processImage = async () => {
     if (!imageFile) return;
     try {
-      const prediction = await predictImage(imageFile);
-      setResult({
-        name: prediction.class_name,
-        score: prediction.confidence.toFixed(1),
-      });
+      const results = await predictImage(imageFile);
+      setPredictions(results);
     } catch (err) {
       console.error('Prediction failed:', err);
     }
@@ -48,7 +40,7 @@ export default function Home() {
   const reset = (e: React.MouseEvent) => {
     e.stopPropagation();
     setPreview(null);
-    setResult(null);
+    setPredictions([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -126,30 +118,50 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Result Card */}
-          <div className={`premium-card rounded-xl p-1 h-full min-h-[400px] flex flex-col relative transition-opacity duration-500 ${result ? 'opacity-100' : 'opacity-80'}`}>
-            <div className="absolute inset-0 bg-batik-pattern opacity-10 pointer-events-none rounded-xl"></div>
+          {/* Right Column */}
+          <div className="flex flex-col gap-6">
+            {/* Main Result Card */}
+            <div className={`premium-card rounded-xl p-1 min-h-[400px] flex flex-col relative transition-opacity duration-500 ${predictions.length > 0 ? 'opacity-100' : 'opacity-80'}`}>
+              <div className="absolute inset-0 bg-batik-pattern opacity-10 pointer-events-none rounded-xl"></div>
 
-            <div className="bg-[#15100b] rounded-lg p-6 md:p-8 grow flex flex-col relative z-10 justify-center">
-              {!result ? (
-                <div className="grow flex flex-col items-center justify-center text-center py-10">
-                  <Sprout className="w-12 h-12 text-kopi-700 mb-4 stroke-1" />
-                  <h4 className="font-display text-kopi-500 text-lg">Menunggu Data</h4>
-                  <p className="text-xs text-kopi-600 mt-2 font-light max-w-xs">Hasil analisis akan menampilkan varietas dan confidence score.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-center h-full animate-fadeIn">
-                  <div className="mb-8">
-                    <p className="text-xs text-emas-500 uppercase tracking-[0.2em] mb-3">Teridentifikasi Sebagai</p>
-                    <h2 className="font-display text-4xl md:text-5xl text-white font-bold leading-tight gold-gradient-text">{result.name}</h2>
+              <div className="bg-[#15100b] rounded-lg p-6 md:p-8 grow flex flex-col relative z-10 justify-center">
+                {predictions.length === 0 ? (
+                  <div className="grow flex flex-col items-center justify-center text-center py-10">
+                    <Sprout className="w-12 h-12 text-kopi-700 mb-4 stroke-1" />
+                    <h4 className="font-display text-kopi-500 text-lg">Menunggu Data</h4>
+                    <p className="text-xs text-kopi-600 mt-2 font-light max-w-xs">Hasil analisis akan menampilkan varietas dan confidence score.</p>
                   </div>
-                  <div className="relative inline-block p-4 border border-kopi-600 rounded-lg bg-kopi-900/40">
-                    <div className="text-4xl font-display font-bold text-emas-400 mb-1">{result.score}%</div>
-                    <div className="text-[10px] text-kopi-500 uppercase tracking-widest">Confidence Score</div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center h-full animate-fadeIn">
+                    <div className="mb-8">
+                      <p className="text-xs text-emas-500 uppercase tracking-[0.2em] mb-3">Teridentifikasi Sebagai</p>
+                      <h2 className="font-display text-4xl md:text-5xl text-white font-bold leading-tight gold-gradient-text">{predictions[0].class_name}</h2>
+                    </div>
+                    <div className="relative inline-block p-4 border border-kopi-600 rounded-lg bg-kopi-900/40">
+                      <div className="text-4xl font-display font-bold text-emas-400 mb-1">{predictions[0].confidence.toFixed(1)}%</div>
+                      <div className="text-[10px] text-kopi-500 uppercase tracking-widest">Confidence Score</div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+
+            {/* Other Predictions Card */}
+            {predictions.length > 1 && (
+              <div className="premium-card rounded-xl p-1 relative animate-fadeIn">
+                <div className="bg-[#15100b] rounded-lg p-6">
+                  <h3 className="font-display text-white text-lg mb-4 border-b border-kopi-700 pb-2">Kemungkinan Lain</h3>
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {predictions.slice(1).map((pred, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-sm hover:bg-kopi-900/30 p-2 rounded transition-colors">
+                        <span className="text-gray-300">{pred.class_name}</span>
+                        <span className="text-emas-500 font-mono">{pred.confidence.toFixed(2)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <Footer />
